@@ -300,6 +300,29 @@ async function manual() { toggleTools(); let c = prompt("HEX CMD:"); if(c) await
 function downloadLog() { toggleTools(); const b = new Blob([document.getElementById('console-out').innerText], {type: 'text/plain'}); const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'XDRAGON_LOG.txt'; a.click(); }
 function toggleTools() { document.getElementById('toolbox-overlay').classList.toggle('hidden'); }
 function ui(cmd) { if(cmd === 'DISP') document.getElementById('display-main').classList.toggle('hidden'); toggleTools(); }
+// ADD THIS TO THE VERY BOTTOM OF YOUR SCRIPT TAG
+async function reqPids() {
+    log("POLLING SUPPORTED PIDS...");
+    let pids00 = await runCmd("0100");
+    if(pids00) log("PIDS 01-20 SUPPORTED: " + pids00);
+    let pids20 = await runCmd("0120");
+    if(pids20) log("PIDS 21-40 SUPPORTED: " + pids20);
+}
+
+// Fixed Manual function to handle the response properly
+async function manual() { 
+    toggleTools(); 
+    let c = prompt("ENTER HEX COMMAND (e.g. 22F40C):"); 
+    if(c) {
+        log("SENDING: " + c);
+        let res = await runCmd(c);
+        if(res.includes("62")) {
+            log("RAW DATA RECEIVED: " + res);
+        } else {
+            log("ECU RESPONSE: " + res);
+        }
+    }
+}
 </script>
 </body>
 </html>
