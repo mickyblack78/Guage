@@ -142,7 +142,6 @@ TAP RED TOOLBOX TO INITIATE UNLOCK SEQUENCE...</div>
     <div class="tool-box" onclick="downloadLog()">10: UPLOAD LOG DATA</div>
     <div class="tool-box" onclick="ui('DISP')">11: TOGGLE CONSOLE</div>
     <div class="tool-box" onclick="toggleTools()">12: RETURN TO DASH</div>
-    <div class="tool-box" style="background: #440000;" onclick="disconnect()">X: FORCE DISCONNECT</div>
 </div>
 
     <script>
@@ -214,10 +213,10 @@ async function connect() {
         if (auth.includes("5003")) {
             log("EXTENDED SESSION ACTIVE");
             startPinger();
-            let seed = await runCmd("2701");
-            if (seed.includes("6701")) {
-                let unlock = await runCmd("270255AA");
-                if (unlock.includes("6702")) {
+            let seed = await runCmd("2501");
+            if (seed.includes("6501")) {
+                let unlock = await runCmd("250255AA");
+                if (unlock.includes("6502")) {
                     log("SUCCESS: DRAGON UNLOCKED");
                     setupDials();
                 }
@@ -230,7 +229,7 @@ function startPinger() {
     if (pinger) clearInterval(pinger); 
     pinger = setInterval(async () => { 
         if (writer && !live) await runCmd("3E00"); 
-    }, 2000); 
+    }, 3000); 
 }
 
 function setupDials() { 
@@ -300,7 +299,7 @@ async function scanner() {
 async function readDTC() { toggleTools(); await runCmd("03"); }
 async function clearCodes() { toggleTools(); if(confirm("Clear Codes?")) await runCmd("04"); }
 async function manual() { toggleTools(); let c = prompt("HEX CMD:"); if(c) await runCmd(c); }
-function downloadLog() { toggleTools(); const b = new Blob([document.getElementById('console-out').innerText], {type: 'text/plain'}); const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'XDRAGON_LOG.txt'; a.click(); }
+function downloadLog() { toggleTools(); const b = new Blob([document.getElementById('console-out').innerText], {type: 'text/plain'}); const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'DRAGON_LOG.txt'; a.click(); }
 function toggleTools() { 
     document.getElementById('toolbox-overlay').classList.toggle('hidden'); 
 }
