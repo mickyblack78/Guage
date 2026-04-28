@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+yes.<!DOCTYPE html>
 <html>
 <head>
     <title>DRAGON MASTER</title>
@@ -306,6 +306,10 @@ display-main').classList.toggle('hidden'); toggleTools(); }
 function ui(cmd) { 
     const consoleBox = document.getElementById('display-main');
     if(cmd === 'DISP') {
+        consoleBox.classList.toggle('hidden');
+    }
+    toggleTools(); 
+}
         consoleBox.classList.toggle('hidden');
         log(consoleBox.classList.contains('hidden') ? "CONSOLE HIDDEN - TAP BUTTON 11 TO RESTORE" : "CONSOLE RESTORED");
     }
