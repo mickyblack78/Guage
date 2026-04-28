@@ -232,35 +232,48 @@ function setupDials() {
     createGauge(2, "TEMP"); 
     createGauge(3, "VOLTS"); 
 }
-
-async function toggleLive() {
+        async function toggleLive() {
     if(!writer) return log("CONNECT FIRST");
     live = !live; 
     toggleTools(); 
-    log(live ? "STREAM START" : "STREAM STOP");
+    log(live ? "--- STARTING TRANSLATED STREAM ---" : "--- STREAM STOPPED ---");
     
     while(live) {
-        // Mode 22 RPM from first app
+        // 1. RPM TRANSLATION (PID: 22F40C)
         let r_rpm = await runCmd("22F40C");
         if(r_rpm.includes("62")) {
             let p = r_rpm.split(" ");
             let h = p.slice(3,5).join("");
-            updateNeedle(1, parseInt(h, 16)/4, 6500);
+            let rpmVal = Math.round(parseInt(h, 16) / 4);
+            updateNeedle(1, rpmVal, 6500);
+            log("ENGINE SPEED: " + rpmVal + " RPM"); // Human Readable
         }
         
-        // Mode 22 Temp from first app
+        // 2. TEMPERATURE TRANSLATION (PID: 22F405)
         let r_tmp = await runCmd("22F405");
         if(r_tmp.includes("62")) {
-            let val = parseInt(r_tmp.split(" ")[3], 16) - 40;
-            updateNeedle(2, val, 120);
+            let p = r_tmp.split(" ");
+            let tempVal = parseInt(p[3], 16) - 40;
+            updateNeedle(2, tempVal, 120);
+            log("COOLANT TEMP: " + tempVal + "°C"); // Human Readable
+            
+            // Visual Warning for "Super Red Hot"
+            if(tempVal > 105) log("!!! WARNING: ENGINE OVERHEATING !!!");
         }
 
+        // 3. SYSTEM VOLTAGE (ATRV)
         let r_volts = await runCmd("ATRV");
-        if(r_volts) updateNeedle(3, parseFloat(r_volts), 18);
+        if(r_volts) {
+            let voltVal = parseFloat(r_volts);
+            updateNeedle(3, voltVal, 18);
+            log("BATTERY: " + voltVal + "V"); // Human Readable
+        }
 
+        // Small delay to keep the UI smooth
         await new Promise(r => setTimeout(r, 100));
     }
-}
+        }
+
 
 function updateNeedle(id, val, max) {
     const n = document.getElementById(`needle-${id}`); 
