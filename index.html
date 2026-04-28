@@ -236,41 +236,38 @@ function setupDials() {
     if(!writer) return log("CONNECT FIRST");
     live = !live; 
     toggleTools(); 
-    log(live ? "--- STARTING TRANSLATED STREAM ---" : "--- STREAM STOPPED ---");
+    log(live ? "--- TRYING DIESEL PIDS (MODE 22) ---" : "--- STREAM STOPPED ---");
     
     while(live) {
-        // 1. RPM TRANSLATION (PID: 22F40C)
-        let r_rpm = await runCmd("22F40C");
-        if(r_rpm.includes("62")) {
+        // Trying the 110C address for RPM
+        let r_rpm = await runCmd("22110C");
+        if(r_rpm.includes("62 11 0C")) {
             let p = r_rpm.split(" ");
             let h = p.slice(3,5).join("");
             let rpmVal = Math.round(parseInt(h, 16) / 4);
             updateNeedle(1, rpmVal, 6500);
-            log("ENGINE SPEED: " + rpmVal + " RPM"); // Human Readable
+            log("DIESEL RPM: " + rpmVal);
         }
         
-        // 2. TEMPERATURE TRANSLATION (PID: 22F405)
-        let r_tmp = await runCmd("22F405");
-        if(r_tmp.includes("62")) {
+        // Trying 221105 or 22114F for Temp
+        let r_tmp = await runCmd("221105");
+        if(r_tmp.includes("62 11 05")) {
             let p = r_tmp.split(" ");
             let tempVal = parseInt(p[3], 16) - 40;
             updateNeedle(2, tempVal, 120);
-            log("COOLANT TEMP: " + tempVal + "°C"); // Human Readable
-            
-            // Visual Warning for "Super Red Hot"
-            if(tempVal > 105) log("!!! WARNING: ENGINE OVERHEATING !!!");
+            log("DIESEL TEMP: " + tempVal + "C");
         }
 
-        // 3. SYSTEM VOLTAGE (ATRV)
+        // Battery (This works, just needs better parsing)
         let r_volts = await runCmd("ATRV");
-        if(r_volts) {
-            let voltVal = parseFloat(r_volts);
+        let vMatch = r_volts.match(/[0-9.]+/);
+        if(vMatch) {
+            let voltVal = parseFloat(vMatch[0]);
             updateNeedle(3, voltVal, 18);
-            log("BATTERY: " + voltVal + "V"); // Human Readable
+            log("BATTERY: " + voltVal + "V");
         }
 
-        // Small delay to keep the UI smooth
-        await new Promise(r => setTimeout(r, 100));
+        await new Promise(r => setTimeout(r, 150));
     }
         }
 
@@ -299,7 +296,15 @@ async function clearCodes() { toggleTools(); if(confirm("Clear Codes?")) await r
 async function manual() { toggleTools(); let c = prompt("HEX CMD:"); if(c) await runCmd(c); }
 function downloadLog() { toggleTools(); const b = new Blob([document.getElementById('console-out').innerText], {type: 'text/plain'}); const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'XDRAGON_LOG.txt'; a.click(); }
 function toggleTools() { document.getElementById('toolbox-overlay').classList.toggle('hidden'); }
-function ui(cmd) { if(cmd === 'DISP') document.getElementById('display-main').classList.toggle('hidden'); toggleTools(); }
+display-main').classList.toggle('hidden'); toggleTools(); }
+function ui(cmd) { 
+    const consoleBox = document.getElementById('display-main');
+    if(cmd === 'DISP') {
+        consoleBox.classList.toggle('hidden');
+        log(consoleBox.classList.contains('hidden') ? "CONSOLE HIDDEN - TAP BUTTON 11 TO RESTORE" : "CONSOLE RESTORED");
+    }
+    toggleTools(); 
+}
 // ADD THIS TO THE VERY BOTTOM OF YOUR SCRIPT TAG
 async function reqPids() {
     log("POLLING SUPPORTED PIDS...");
