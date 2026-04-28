@@ -176,7 +176,7 @@ async function runCmd(c) {
     if(!writer) return;
     await writer.write(enc.encode(c + "\r"));
     let r = ""; 
-    while (true) {
+    while (port.readable) { // This kills the loop if the port closes or disconnects
         const { value } = await reader.read();
         r += dec.decode(value); 
         if (r.includes(">")) break;
