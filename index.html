@@ -172,23 +172,17 @@ function createGauge(id, label) {
         <div class="dial-label"><span id="val-${id}">0</span><br><small>${label}</small></div>
     `;
 }
-
 async function runCmd(c) {
-    if(!writer) return "OFFLINE";
-    try {
-        await writer.write(enc.encode(c + "\r"));
-        let r = ""; 
-        const timeout = Date.now() + 1500;
-        while (Date.now() < timeout) {
-            const { value } = await reader.read();
-            r += dec.decode(value); 
-            if (r.includes(">")) break;
+    if(!writer) return;
+    await writer.write(enc.encode(c + "\r"));
+    let r = ""; 
+    while (true) {
+        const { value } = await reader.read();
+        r += dec.decode(value); 
+        if (r.includes(">")) break;
+    }
+    return r.trim();
         }
-        let clean = r.replace(/>/g, "").trim();
-        log(c + ": " + clean); 
-        return clean;
-    } catch(e) { return "ERR"; }
-}
 
 async function connect() {
     toggleTools();
