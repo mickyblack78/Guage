@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>STUDIO69 - 3D WORKSPACE</title>
+    <style>
+        :root { 
+            --bg: #050505; 
+            --panel: rgba(15, 15, 15, 0.95); 
+            --border: #333; 
+            --neon: #00ffff; 
+            --active-bg: rgba(0, 255, 255, 0.1); 
+            --ghost: rgba(5, 5, 5, 0.75); /* Creates the 25% visibility effect for locked zones */
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; -webkit-user-select: none; touch-action: none; font-family: monospace; }
+        body { background: var(--bg); height: 100vh; width: 100vw; overflow: hidden; color: #666; }
+        
+        #viewport { position: absolute; top: 0; left: 0; width: 100%; height: 100%; transform-origin: 0 0; }
+        canvas { position: absolute; top: 0; left: 0; display: block; }
+        
+        /* Specialized 3D layer stacks */
+        #bg-template-canvas { z-index: 5; opacity: 0.4; } /* For imported 2D drawings */
+        #main-3d-canvas { z-index: 10; }                  /* For active drawing */
+        #mask-zonal-canvas { z-index: 15; pointer-events: none; } /* Handles the 25% grey sliders look */
+        #temp-ui-canvas { z-index: 20; pointer-events: none; }    /* For crosshair guides */
+        
+        .dock {
+            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); width: 96%; max-width: 600px;
+            display: flex; justify-content: space-between; background: var(--panel); padding: 10px;
+            border-radius: 40px; border: 1px solid var(--border); z-index: 9999;
+        }
+        .dock-btn {
+            flex: 1; height: 50px; margin: 0 4px; border-radius: 25px; border: 1px solid var(--border);
+            background: #111; display: flex; align-items: center; justify-content: center;
+            color: #888; font-size: 11px; font-weight: 900; transition: 0.2s; cursor: pointer;
+        }
+        .active-btn { border-color: var(--neon) !important; color: var(--neon) !important; background: var(--active-bg); box-shadow: 0 0 15px rgba(0, 255, 255, 0.2); }
+        
+        .overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8); z-index: 9000; display: none;
+            align-items: center; justify-content: center; flex-direction: column;
+        }
+        .menu-box {
+            background: var(--panel); border: 1px solid var(--border); padding: 20px;
+            border-radius: 20px; width: 90%; max-width: 450px; display: flex; flex-direction: column; gap: 10px;
+        }
+        .menu-row { display: flex; gap: 10px; width: 100%; }
+        .menu-item {
+            flex: 1; height: 50px; background: #111; border: 1px solid var(--border); border-radius: 12px;
+            display: flex; align-items: center; justify-content: center; color: #aaa; cursor: pointer; font-weight: bold; font-size: 12px;
+        }
+        .grid-3x4 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; width: 100%; }
+        
+        .slider-title { width: 100%; text-align: left; color: #888; font-size: 10px; margin-top: 8px; text-transform: uppercase; letter-spacing: 1px; }
+        input[type="range"] { width: 100%; margin: 8px 0; height: 20px; border-radius: 10px; -webkit-appearance: none; outline: none; background: #222; }
+        input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px; height: 24px; border-radius: 50%; background: #fff; border: 2px solid #000; cursor: pointer; }
+        
+        /* Live feedback telemetry label */
+        #telemetry-display {
+            position: fixed; top: 20px; left: 20px; font-size: 11px; color: var(--neon); 
+            background: rgba(0,0,0,0.5); padding: 10px; border-left: 2px solid var(--neon); z-index: 8000; pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Real-time angle and slider feedback -->
+    <div id="telemetry-display">
+        VIEW: <span id="tel-view">0° SIDE</span><br>
+        ACTIVE ZONE: <span id="tel-zone">FULL REPO</span>
+    </div>
+
+    <!-- 3D Canvas Layer Stack -->
+    <div id="viewport">
+        <canvas id="bg-template-canvas"></canvas>
+        <canvas id="main-3d-canvas"></canvas>
+        <canvas id="mask-zonal-canvas"></canvas>
+        <canvas id="temp-ui-canvas"></canvas>
+    </div>
+
+    <!-- MAIN CONTROL DOCK -->
+    <div class="dock">
+        <div class="dock-btn" id="btn-view" onclick="toggleOverlay('view')">VIEW ENGINE</div>
+        <div class="dock-btn" id="btn-sliders" onclick="toggleOverlay('sliders')">XYZ MAPPERS</div>
+        <div class="dock-btn" id="btn-tools" onclick="toggleOverlay('tools')">3D ENGINE</div>
+        <div class="dock-btn" id="btn-generate" onclick="triggerEmulation()" style="color: #f0f;">GENERATE</div>
+    </div>
+
+    <!-- VIEW ENGINE OVERLAY -->
+    <div class="overlay" id="overlay-view">
+        <div class="menu-box">
+            <div class="slider-title">Turntable Orbit (0° - 180° Free Floating)</div>
+            <input type="range" id="slider-orbit" min="0" max="180" value="0" step="0.5" oninput="updateOrbit(this.value)">
+            <div class="grid-3x4" style="grid-template-columns: repeat(3, 1fr);">
+                <div class="menu-item" onclick="snapToAngle(0)">0° SIDE</div>
+                <div class="menu-item" onclick="snapToAngle(90)">90° FRONT</div>
+                <div class="menu-item" onclick="snapToAngle(180)">180° REVERSE</div>
+            </div>
+            <div class="menu-item" onclick="toggleOverlay('view')" style="margin-top: 10px; border-color: #555;">CLOSE VIEW</div>
+        </div>
+    </div>
+
+    <!-- XYZ COORDINATE SLIDERS OVERLAY -->
+    <div class="overlay" id="overlay-sliders">
+        <div class="menu-box">
+            <div class="slider-title" id="lbl-horiz-slider">Horizontal Boundaries (X-Axis)</div>
+            <input type="range" id="slider-x-min" min="0" max="100" value="0" oninput="updateZonalMask()">
+            <input type="range" id="slider-x-max" min="0" max="100" value="100" oninput="updateZonalMask()">
+            
+            <div class="slider-title">Vertical Boundaries (Y-Axis / Height)</div>
+            <input type="range" id="slider-y-min" min="0" max="100" value="0" oninput="updateZonalMask()">
+            <input type="range" id="slider-y-max" min="0" max="100" value="100" oninput="updateZonalMask()">
+            
+            <div class="menu-row">
+                <div class="menu-item" onclick="resetSliders()">RESET BOUNDS</div>
+                <div class="menu-item" onclick="toggleOverlay('sliders')" style="border-color: #555;">LOCK AREA</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3D TOOLS & GENERATION LOGIC OVERLAY -->
+    <div class="overlay" id="overlay-tools">
+        <div class="menu-box">
+            <div class="grid-3x4">
+                <div class="menu-item tool-btn" onclick="select3DTool(this, 'BRUSH')">BRUSH</div>
+                <div class="menu-item tool-btn" onclick="select3DTool(this, 'LINE')">LINE</div>
+                <div class="menu-item tool-btn" onclick="select3DTool(this, 'ERASER')">ERASER</div>
+                <div class="menu-item tool-btn" onclick="select3DTool(this, 'ZOOM')">ZOOM</div>
+                <div class="menu-item" onclick="triggerCopyInvert()" style="color: var(--neon);">COPY & INVERT</div>
+                <div class="menu-item" onclick="triggerImport()">IMPORT 2D</div>
+                <div class="menu-item" onclick="performUndo()">UNDO</div>
+                <div class="menu-item" onclick="clearCanvas()" style="color: #f33;">CLEAR ALL</div>
+            </div>
+            <div class="menu-item" onclick="toggleOverlay('tools')" style="margin-top: 10px; border-color: #555;">CLOSE DOCK</div>
+        </div>
+    </div>
+
+    <script>
+        // Core tracking variables
+        let currentAngle = 0;
+        let activeTool = 'BRUSH';
+
+        // Interface basic toggle logic
+        function toggleOverlay(id) {
+            const el = document.getElementById('overlay-' + id);
+            if (el.style.display === 'flex') {
+                el.style.display = 'none';
+            </div> else {
+                // Close other overlays first
+                document.querySelectorAll('.overlay').forEach(o => o.style.display = 'none');
+                el.style.display = 'flex';
+            }
+        }
+
+        function snapToAngle(angle) {
+            document.getElementById('slider-orbit').value = angle;
+            updateOrbit(angle);
+        }
+
+        function updateOrbit(val) {
+            currentAngle = parseFloat(val);
+            document.getElementById('tel-view').innerText = currentAngle % 90 === 0 ? `${currentAngle}° SNAP` : `${currentAngle}° ORBIT`;
+            
+            // Updates label text based on view plane rotation dynamically
+            const horizLabel = document.getElementById('lbl-horiz-slider');
+            if (currentAngle >= 45 && currentAngle <= 135) {
+                horizLabel.innerText = "Horizontal Boundaries (Z-Axis / Width)";
+            } else {
+                horizLabel.innerText = "Horizontal Boundaries (X-Axis / Length)";
+            }
+        }
+
+        function select3DTool(btn, tool) {
+            document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active-btn'));
+            btn.classList.add('active-btn');
+            activeTool = tool;
+        }
+
+        function resetSliders() {
+            document.getElementById('slider-x-min').value = 0;
+            document.getElementById('slider-x-max').value = 100;
+            document.getElementById('slider-y-min').value = 0;
+            document.getElementById('slider-y-max').value = 100;
+            document.getElementById('tel-zone').innerText = "FULL REPO";
+        }
+
+        function updateZonalMask() {
+          document.getElementById('tel-zone').innerText = "ISOLATED ZONE ACTIVE";// Structural graphics mask rendering pipeline will catch this trigger in block 2}function triggerEmulation() { alert("Executing 3D Emulation Pipeline..."); }function triggerCopyInvert() { alert("Symmetrical 180° Flip Executed."); }function triggerImport() { alert("Caching local repo template file..."); }function performUndo() { }function clearCanvas() { }
